@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mercado — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  .cabecera-pagina { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+  .controles-mercado { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controles-mercado select, .controles-mercado input {
+    background: var(--color-roca); border: 1px solid var(--color-veta); color: var(--color-hueso);
+    border-radius: var(--radio-sm); padding: 9px 12px; font-family: var(--fuente-cuerpo); font-size: 13.5px;
+  }
+  .pestanas-modo { display: flex; gap: 6px; margin-bottom: 18px; }
+  .pestana-modo {
+    padding: 8px 16px; border-radius: 100px; font-size: 13px; cursor: pointer;
+    background: var(--color-roca); border: 1px solid var(--color-veta); color: var(--color-hueso-tenue);
+  }
+  .pestana-modo.activa { background: var(--color-cobre); color: #17110a; border-color: var(--color-cobre); }
+
+  .grid-indicadores { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 900px) { .grid-indicadores { grid-template-columns: repeat(2, 1fr); } }
+  .indicador-mini { text-align: center; padding: 12px 8px; }
+  .indicador-mini .valor { font-family: var(--fuente-datos); font-size: 17px; font-weight: 600; }
+  .indicador-mini .etiqueta { font-size: 11px; color: var(--color-hueso-debil); margin-top: 4px; }
+
+  #contenedor-grafico { min-height: 460px; }
+  #contenedor-correlacion { min-height: 320px; }
+  .oculto { display: none; }
+</style>
+</head>
+<body data-pagina="mercado">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Mercado</h1>
+      <div class="controles-mercado">
+        <select id="selector-ticker">
+          <option value="FSM">FSM — Fortuna Silver Mines</option>
+          <option value="VOLCABC1.LM">VOLCABC1.LM — Volcan</option>
+          <option value="ABX.TO">ABX.TO — Barrick Gold</option>
+          <option value="BVN" selected>BVN — Buenaventura</option>
+          <option value="BHP">BHP — BHP Billiton</option>
+        </select>
+        <select id="selector-periodo">
+          <option value="30">30 días</option>
+          <option value="90" selected>90 días</option>
+          <option value="180">180 días</option>
+          <option value="365">1 año</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="pestanas-modo">
+      <div class="pestana-modo activa" data-modo="individual">Ticker individual</div>
+      <div class="pestana-modo" data-modo="comparar">Comparar tickers</div>
+      <div class="pestana-modo" data-modo="correlacion">Mapa de correlación</div>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error oculto">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <section id="vista-individual">
+      <div class="tarjeta">
+        <div id="contenedor-grafico">
+          <div class="skeleton" style="height:420px;"></div>
+        </div>
+      </div>
+      <div class="grid-indicadores" id="grid-indicadores"></div>
+    </section>
+
+    <section id="vista-comparar" class="oculto">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">
+          Selecciona hasta 4 tickers para superponer
+        </h3>
+        <div id="checks-comparar" style="display:flex; gap:14px; margin-bottom:16px; flex-wrap:wrap;"></div>
+        <div id="contenedor-grafico-comparar" style="min-height:420px;"></div>
+      </div>
+    </section>
+
+    <section id="vista-correlacion" class="oculto">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">
+          Correlación de retornos diarios entre los 5 tickers
+        </h3>
+        <div id="contenedor-correlacion">
+          <div class="skeleton" style="height:300px;"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  const TICKERS = ["FSM", "VOLCABC1.LM", "ABX.TO", "BVN", "BHP"];
+  const COLORES_LINEA = ["#b5713c", "#8da3b0", "#d9925f", "#6f9e7d", "#a67ab8"];
+
+  document.addEventListener("DOMContentLoaded", () => {
+    inicializarPestanas();
+    inicializarChecksComparar();
+    cargarGraficoIndividual();
+
+    document.getElementById("selector-ticker").addEventListener("change", cargarGraficoIndividual);
+    document.getElementById("selector-periodo").addEventListener("change", cargarGraficoIndividual);
+  });
+
+  function inicializarPestanas() {
+    const pestanas = document.querySelectorAll(".pestana-modo");
+    const vistas = { individual: "vista-individual", comparar: "vista-comparar", correlacion: "vista-correlacion" };
+
+    pestanas.forEach((pestana) => {
+      pestana.addEventListener("click", () => {
+        pestanas.forEach((p) => p.classList.remove("activa"));
+        pestana.classList.add("activa");
+        Object.values(vistas).forEach((id) => document.getElementById(id).classList.add("oculto"));
+        document.getElementById(vistas[pestana.dataset.modo]).classList.remove("oculto");
+
+        if (pestana.dataset.modo === "correlacion") cargarCorrelacion();
+        if (pestana.dataset.modo === "comparar") cargarComparacion();
+      });
+    });
+  }
+
+  function inicializarChecksComparar() {
+    const contenedor = document.getElementById("checks-comparar");
+    contenedor.innerHTML = TICKERS.map((t, i) => `
+      <label style="display:flex; align-items:center; gap:6px; font-size:13.5px; font-family: var(--fuente-datos);">
+        <input type="checkbox" class="check-ticker-comparar" value="${t}" ${i < 2 ? "checked" : ""}>
+        <span style="color:${COLORES_LINEA[i]};">●</span> ${t}
+      </label>
+    `).join("");
+    contenedor.querySelectorAll("input").forEach((c) => c.addEventListener("change", cargarComparacion));
+  }
+
+  async function cargarGraficoIndividual() {
+    const ticker = document.getElementById("selector-ticker").value;
+    const periodo = document.getElementById("selector-periodo").value;
+    const contenedor = document.getElementById("contenedor-grafico");
+
+    try {
+      const respuesta = await ErnestoAPI.get(`/api/mercado/${ticker}?periodo=${periodo}`);
+      dibujarCandlestick(respuesta.datos, ticker);
+      dibujarIndicadoresResumen(respuesta.datos.at(-1));
+    } catch (error) {
+      manejarError(error, contenedor);
+    }
+  }
+
+  function dibujarCandlestick(datos, ticker) {
+    const fechas = datos.map((d) => d.fecha);
+    const trazoVelas = {
+      x: fechas, open: datos.map((d) => d.open), high: datos.map((d) => d.high),
+      low: datos.map((d) => d.low), close: datos.map((d) => d.close),
+      type: "candlestick", name: ticker,
+      increasing: { line: { color: "#3f9463" } }, decreasing: { line: { color: "#c25b52" } },
+      yaxis: "y",
+    };
+    const sma20 = { x: fechas, y: datos.map((d) => d.indicadores.sma_20), type: "scatter", mode: "lines", name: "SMA 20", line: { color: "#8da3b0", width: 1.4 } };
+    const sma50 = { x: fechas, y: datos.map((d) => d.indicadores.sma_50), type: "scatter", mode: "lines", name: "SMA 50", line: { color: "#d9925f", width: 1.4 } };
+    const volumen = { x: fechas, y: datos.map((d) => d.volume), type: "bar", name: "Volumen", yaxis: "y2", marker: { color: "rgba(141,163,176,0.35)" } };
+
+    const layout = {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+      margin: { t: 10, r: 10, l: 50, b: 30 },
+      xaxis: { gridcolor: "#262d3a", rangeslider: { visible: false } },
+      yaxis: { gridcolor: "#262d3a", domain: [0.28, 1] },
+      yaxis2: { domain: [0, 0.2], gridcolor: "#262d3a" },
+      legend: { orientation: "h", y: 1.08 },
+    };
+
+    Plotly.newPlot("contenedor-grafico", [trazoVelas, sma20, sma50, volumen], layout, { responsive: true, displayModeBar: false });
+  }
+
+  function dibujarIndicadoresResumen(ultimoPunto) {
+    const grid = document.getElementById("grid-indicadores");
+    if (!ultimoPunto) { grid.innerHTML = ""; return; }
+    const ind = ultimoPunto.indicadores;
+    const items = [
+      { etiqueta: "Cierre", valor: `$${ultimoPunto.close?.toFixed(2) ?? "—"}` },
+      { etiqueta: "RSI (14)", valor: ind.rsi_14?.toFixed(1) ?? "—" },
+      { etiqueta: "MACD", valor: ind.macd?.toFixed(3) ?? "—" },
+      { etiqueta: "SMA 20", valor: ind.sma_20?.toFixed(2) ?? "—" },
+      { etiqueta: "SMA 50", valor: ind.sma_50?.toFixed(2) ?? "—" },
+    ];
+    grid.innerHTML = items.map((i) => `
+      <div class="tarjeta indicador-mini">
+        <div class="valor">${i.valor}</div>
+        <div class="etiqueta">${i.etiqueta}</div>
+      </div>
+    `).join("");
+  }
+
+  async function cargarComparacion() {
+    const seleccionados = [...document.querySelectorAll(".check-ticker-comparar:checked")].map((c) => c.value);
+    const contenedor = document.getElementById("contenedor-grafico-comparar");
+    if (!seleccionados.length) { contenedor.innerHTML = '<div class="estado-vacio">Selecciona al menos un ticker.</div>'; return; }
+
+    try {
+      const respuesta = await ErnestoAPI.get(`/api/mercado/comparar?tickers=${seleccionados.join(",")}&periodo=180`);
+      const trazos = respuesta.series.map((serie, i) => ({
+        x: serie.datos.map((d) => d.fecha),
+        y: serie.datos.map((d) => d.close),
+        type: "scatter", mode: "lines", name: serie.ticker,
+        line: { color: COLORES_LINEA[TICKERS.indexOf(serie.ticker)] || COLORES_LINEA[i], width: 2 },
+      }));
+      Plotly.newPlot("contenedor-grafico-comparar", trazos, {
+        paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+        font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+        margin: { t: 10, r: 10, l: 50, b: 30 },
+        xaxis: { gridcolor: "#262d3a" }, yaxis: { gridcolor: "#262d3a", title: "Precio de cierre (USD)" },
+        legend: { orientation: "h", y: 1.08 },
+      }, { responsive: true, displayModeBar: false });
+    } catch (error) {
+      manejarError(error, contenedor);
+    }
+  }
+
+  async function cargarCorrelacion() {
+    const contenedor = document.getElementById("contenedor-correlacion");
+    try {
+      const { tickers, matriz } = await ErnestoAPI.get("/api/mercado/correlacion?periodo=180");
+      Plotly.newPlot("contenedor-correlacion", [{
+        z: matriz, x: tickers, y: tickers, type: "heatmap",
+        colorscale: [[0, "#c25b52"], [0.5, "#1b2029"], [1, "#3f9463"]],
+        zmin: -1, zmax: 1, texttemplate: "%{z:.2f}", showscale: true,
+      }], {
+        paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+        font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 12 },
+        margin: { t: 10, r: 10, l: 90, b: 60 },
+      }, { responsive: true, displayModeBar: false });
+    } catch (error) {
+      manejarError(error, contenedor);
+    }
+  }
+
+  function manejarError(error, contenedor) {
+    if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+      document.getElementById("aviso-api").classList.remove("oculto");
+    }
+    contenedor.innerHTML = `<div class="estado-vacio">No se pudieron cargar los datos. ${error.message || ""}</div>`;
+  }
+</script>
+</body>
+</html>

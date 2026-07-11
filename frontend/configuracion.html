@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configuración — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 22px; }
+  .tarjeta-config { max-width: 520px; margin-bottom: 18px; }
+  .tarjeta-config h3 { font-size: 14px; margin-bottom: 4px; }
+  .tarjeta-config p.descripcion { font-size: 12.5px; color: var(--color-hueso-tenue); margin-bottom: 16px; }
+  .fila-api { display: flex; gap: 8px; }
+  .fila-api input { flex: 1; }
+
+  .fila-toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+  .fila-toggle:not(:last-child) { border-bottom: 1px solid var(--color-veta); }
+  .interruptor { position: relative; width: 42px; height: 24px; }
+  .interruptor input { opacity: 0; width: 0; height: 0; }
+  .interruptor .pista { position: absolute; inset: 0; background: var(--color-veta); border-radius: 100px; cursor: pointer; transition: 0.2s; }
+  .interruptor .pista::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: var(--color-hueso); border-radius: 50%; transition: 0.2s; }
+  .interruptor input:checked + .pista { background: var(--color-cobre); }
+  .interruptor input:checked + .pista::before { transform: translateX(18px); }
+
+  .estado-conexion { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 10px; }
+  .punto-conexion { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body data-pagina="configuracion">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina"><h1>Configuración</h1></div>
+
+    <div class="tarjeta tarjeta-config">
+      <h3>Conexión con la API</h3>
+      <p class="descripcion">La URL cambia cada vez que reinicias el notebook de ngrok en Colab. Actualízala aquí sin tener que volver a iniciar sesión.</p>
+      <div class="fila-api">
+        <input type="text" id="input-api-url" placeholder="https://xxxx.ngrok-free.app">
+        <button id="boton-guardar-api" class="boton boton-primario">Guardar</button>
+      </div>
+      <div class="estado-conexion" id="estado-conexion">
+        <span class="punto-conexion" style="background:var(--color-hueso-debil);"></span>
+        <span>Verificando conexión...</span>
+      </div>
+    </div>
+
+    <div class="tarjeta tarjeta-config">
+      <h3>Preferencias de la interfaz</h3>
+      <p class="descripcion">Ajustes que se guardan solo en este navegador.</p>
+      <div class="fila-toggle">
+        <span>Actualizar datos automáticamente cada 60s</span>
+        <label class="interruptor">
+          <input type="checkbox" id="toggle-autorefresh">
+          <span class="pista"></span>
+        </label>
+      </div>
+      <div class="fila-toggle">
+        <span>Notificaciones de nuevas señales</span>
+        <label class="interruptor">
+          <input type="checkbox" id="toggle-notificaciones" checked>
+          <span class="pista"></span>
+        </label>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("input-api-url").value = ErnestoAPI.obtenerApiUrl();
+    verificarConexion();
+
+    document.getElementById("boton-guardar-api").addEventListener("click", () => {
+      const valor = document.getElementById("input-api-url").value;
+      if (!valor.trim()) return;
+      ErnestoAPI.guardarApiUrl(valor);
+      verificarConexion();
+    });
+
+    document.getElementById("toggle-autorefresh").checked = localStorage.getItem("ernesto_autorefresh") === "true";
+    document.getElementById("toggle-autorefresh").addEventListener("change", (e) => {
+      localStorage.setItem("ernesto_autorefresh", e.target.checked);
+    });
+
+    document.getElementById("toggle-notificaciones").addEventListener("change", (e) => {
+      localStorage.setItem("ernesto_notificaciones", e.target.checked);
+    });
+  });
+
+  async function verificarConexion() {
+    const estado = document.getElementById("estado-conexion");
+    try {
+      await ErnestoAPI.get("/api/salud");
+      estado.innerHTML = '<span class="punto-conexion" style="background:var(--color-buy); box-shadow:0 0 0 3px var(--color-buy-fondo);"></span><span>Conectado correctamente</span>';
+    } catch (error) {
+      estado.innerHTML = `<span class="punto-conexion" style="background:var(--color-sell);"></span><span>${error.message || "Sin conexión"}</span>`;
+    }
+  }
+</script>
+</body>
+</html>

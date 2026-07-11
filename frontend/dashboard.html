@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina { margin-bottom: 26px; }
+  .cabecera-pagina .saludo { color: var(--color-hueso-tenue); font-size: 14px; margin-bottom: 4px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+
+  .grid-widgets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+  .grid-principal {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 1100px) {
+    .grid-widgets { grid-template-columns: 1fr 1fr; }
+    .grid-principal { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .grid-widgets { grid-template-columns: 1fr; }
+  }
+
+  .widget-reloj .hora-mercado { font-family: var(--fuente-datos); font-size: 28px; margin: 6px 0; }
+  .estado-mercado { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .punto-estado { width: 8px; height: 8px; border-radius: 50%; }
+  .punto-abierto { background: var(--color-buy); box-shadow: 0 0 0 3px var(--color-buy-fondo); }
+  .punto-cerrado { background: var(--color-hueso-debil); }
+
+  .tarjeta h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-hueso-tenue);
+    margin-bottom: 14px;
+  }
+
+  .fila-ticker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-veta);
+  }
+  .fila-ticker:last-child { border-bottom: none; }
+  .fila-ticker .ticker-nombre { font-family: var(--fuente-datos); font-size: 13.5px; font-weight: 600; }
+  .fila-ticker .fuerza { font-family: var(--fuente-datos); font-size: 12px; color: var(--color-hueso-debil); }
+
+  .item-actividad {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-veta);
+  }
+  .item-actividad:last-child { border-bottom: none; }
+  .item-actividad .icono-actividad {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-family: var(--fuente-datos); font-size: 11px; font-weight: 700;
+  }
+  .item-actividad .texto-actividad { flex: 1; font-size: 13.5px; }
+  .item-actividad .texto-actividad .modelo { color: var(--color-hueso-debil); font-size: 12px; }
+  .item-actividad .fecha-actividad { font-size: 11.5px; color: var(--color-hueso-debil); white-space: nowrap; }
+
+  .skeleton-linea { height: 14px; margin-bottom: 8px; }
+  .estado-vacio { color: var(--color-hueso-debil); font-size: 13.5px; text-align: center; padding: 30px 0; }
+</style>
+</head>
+<body data-pagina="dashboard">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <div class="saludo" id="texto-saludo">Bienvenido de nuevo</div>
+      <h1>Dashboard</h1>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en
+      <a href="configuracion.html" style="text-decoration: underline;">Configuración</a>.
+    </div>
+
+    <section class="grid-widgets">
+      <div class="tarjeta widget-reloj">
+        <h3>Reloj de mercado</h3>
+        <div class="hora-mercado" id="hora-actual">--:--:--</div>
+        <div class="estado-mercado">
+          <span class="punto-estado" id="punto-nyse"></span>
+          <span id="texto-nyse">NYSE</span>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h3>Modelos entrenados</h3>
+        <div class="hora-mercado" id="conteo-modelos" style="font-size:28px;">—</div>
+        <div style="font-size:12.5px; color:var(--color-hueso-tenue);">SVC · LSTM · BiLSTM · GRU · SimpleRNN · Regresor</div>
+      </div>
+
+      <div class="tarjeta">
+        <h3>Tickers activos</h3>
+        <div class="hora-mercado" style="font-size:28px;">5</div>
+        <div style="font-size:12.5px; color:var(--color-hueso-tenue);">FSM · VOLCABC1.LM · ABX.TO · BVN · BHP</div>
+      </div>
+    </section>
+
+    <section class="grid-principal">
+      <div class="tarjeta">
+        <h3>Ranking de señales</h3>
+        <div id="lista-ranking">
+          <div class="skeleton skeleton-linea"></div>
+          <div class="skeleton skeleton-linea"></div>
+          <div class="skeleton skeleton-linea"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h3>Actividad reciente</h3>
+        <div id="lista-actividad">
+          <div class="skeleton skeleton-linea"></div>
+          <div class="skeleton skeleton-linea"></div>
+          <div class="skeleton skeleton-linea"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const usuario = ErnestoAPI.obtenerUsuario();
+    if (usuario) {
+      document.getElementById("texto-saludo").textContent = `Bienvenido de nuevo, ${usuario.nombre_completo.split(" ")[0]}`;
+    }
+
+    iniciarRelojMercado();
+    cargarRanking();
+    cargarActividadReciente();
+    cargarConteoModelos();
+  });
+
+  async function cargarConteoModelos() {
+    const elemento = document.getElementById("conteo-modelos");
+    try {
+      const { resultados } = await ErnestoAPI.get("/api/metricas/global");
+      elemento.textContent = `${resultados.length}/6`;
+    } catch (_error) {
+      elemento.textContent = "0/6";
+    }
+  }
+
+  function iniciarRelojMercado() {
+    function actualizar() {
+      const ahora = new Date();
+      document.getElementById("hora-actual").textContent = ahora.toLocaleTimeString("es-PE", { hour12: false });
+
+      // NYSE opera 9:30-16:00 hora de Nueva York, aproximado sin libreria de zonas horarias
+      const horaNY = new Date(ahora.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      const minutosDelDia = horaNY.getHours() * 60 + horaNY.getMinutes();
+      const diaSemana = horaNY.getDay();
+      const abierto = diaSemana >= 1 && diaSemana <= 5 && minutosDelDia >= 570 && minutosDelDia <= 960;
+
+      document.getElementById("punto-nyse").className = "punto-estado " + (abierto ? "punto-abierto" : "punto-cerrado");
+      document.getElementById("texto-nyse").textContent = `NYSE ${abierto ? "abierto" : "cerrado"} · ${horaNY.toLocaleTimeString("es-PE", { hour12: false })} hora NY`;
+    }
+    actualizar();
+    setInterval(actualizar, 1000);
+  }
+
+  async function cargarRanking() {
+    const contenedor = document.getElementById("lista-ranking");
+    try {
+      const { ranking } = await ErnestoAPI.get("/api/ranking");
+      if (!ranking.length) {
+        contenedor.innerHTML = '<div class="estado-vacio">Aún no hay predicciones. Ejecuta los notebooks de modelos.</div>';
+        return;
+      }
+      contenedor.innerHTML = ranking.map((item) => `
+        <div class="fila-ticker">
+          <a href="ticker-detalle.html?ticker=${encodeURIComponent(item.ticker)}" class="ticker-nombre" style="color:var(--color-hueso);">${item.ticker}</a>
+          <span class="insignia ${item.senal_consenso === "BUY" ? "insignia-buy" : "insignia-sell"}">${item.senal_consenso}</span>
+          <span class="fuerza">${item.fuerza_senal.toFixed(2)}</span>
+        </div>
+      `).join("");
+    } catch (error) {
+      manejarErrorApi(error, contenedor, "No se pudo cargar el ranking.");
+    }
+  }
+
+  async function cargarActividadReciente() {
+    const contenedor = document.getElementById("lista-actividad");
+    try {
+      const { actividad } = await ErnestoAPI.get("/api/actividad-reciente?limite=8");
+      if (!actividad.length) {
+        contenedor.innerHTML = '<div class="estado-vacio">Sin actividad todavía.</div>';
+        return;
+      }
+      contenedor.innerHTML = actividad.map((item) => {
+        const esBuy = item.senal === "BUY";
+        const etiqueta = item.senal || (item.precio_predicho ? `$${item.precio_predicho.toFixed(2)}` : "—");
+        return `
+          <div class="item-actividad">
+            <div class="icono-actividad" style="background:${esBuy ? "var(--color-buy-fondo)" : "var(--color-sell-fondo)"}; color:${esBuy ? "var(--color-buy)" : "var(--color-sell)"};">
+              ${item.ticker.slice(0, 2)}
+            </div>
+            <div class="texto-actividad">
+              <div>${item.ticker} — ${etiqueta}</div>
+              <div class="modelo">${item.modelo}</div>
+            </div>
+            <div class="fecha-actividad">${new Date(item.fecha_generacion).toLocaleDateString("es-PE")}</div>
+          </div>
+        `;
+      }).join("");
+    } catch (error) {
+      manejarErrorApi(error, contenedor, "No se pudo cargar la actividad reciente.");
+    }
+  }
+
+  function manejarErrorApi(error, contenedor, mensajeGenerico) {
+    if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+      document.getElementById("aviso-api").style.display = "block";
+    }
+    contenedor.innerHTML = `<div class="estado-vacio">${mensajeGenerico}</div>`;
+  }
+</script>
+</body>
+</html>

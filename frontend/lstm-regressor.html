@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regresor LSTM — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  .cabecera-pagina { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+  .controles { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .pastillas-horizonte { display: flex; gap: 6px; }
+  .pastilla-horizonte {
+    padding: 7px 14px; border-radius: 100px; font-size: 12.5px; font-family: var(--fuente-datos); cursor: pointer;
+    background: var(--color-roca); border: 1px solid var(--color-veta); color: var(--color-hueso-tenue);
+  }
+  .pastilla-horizonte.activa { background: var(--color-cobre); color: #17110a; border-color: var(--color-cobre); }
+
+  .grid-metricas-regresor { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 800px) { .grid-metricas-regresor { grid-template-columns: repeat(2, 1fr); } }
+  .metrica-mini { text-align: center; padding: 14px 6px; }
+  .metrica-mini .valor { font-family: var(--fuente-datos); font-size: 19px; font-weight: 600; }
+  .metrica-mini .etiqueta { font-size: 10.5px; color: var(--color-hueso-debil); margin-top: 4px; }
+</style>
+</head>
+<body data-pagina="lstm-regressor">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Regresor LSTM — Pronóstico de precios</h1>
+      <div class="controles">
+        <select id="selector-ticker">
+          <option value="FSM">FSM</option>
+          <option value="VOLCABC1.LM">VOLCABC1.LM</option>
+          <option value="ABX.TO">ABX.TO</option>
+          <option value="BVN" selected>BVN</option>
+          <option value="BHP">BHP</option>
+        </select>
+        <div class="pastillas-horizonte" id="pastillas-horizonte">
+          <div class="pastilla-horizonte" data-horizonte="7">7d</div>
+          <div class="pastilla-horizonte" data-horizonte="14">14d</div>
+          <div class="pastilla-horizonte activa" data-horizonte="30">30d</div>
+          <div class="pastilla-horizonte" data-horizonte="60">60d</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="tarjeta">
+      <div id="grafico-pronostico" style="min-height:400px;">
+        <div class="skeleton" style="height:380px;"></div>
+      </div>
+    </div>
+
+    <div class="grid-metricas-regresor" id="grid-metricas-regresor"></div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  let horizonteActual = 30;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    cargarPronostico();
+    document.getElementById("selector-ticker").addEventListener("change", cargarPronostico);
+    document.querySelectorAll(".pastilla-horizonte").forEach((pastilla) => {
+      pastilla.addEventListener("click", () => {
+        document.querySelectorAll(".pastilla-horizonte").forEach((p) => p.classList.remove("activa"));
+        pastilla.classList.add("activa");
+        horizonteActual = Number(pastilla.dataset.horizonte);
+        cargarPronostico();
+      });
+    });
+  });
+
+  async function cargarPronostico() {
+    const ticker = document.getElementById("selector-ticker").value;
+    try {
+      const [pronostico, mercado, comparador] = await Promise.all([
+        ErnestoAPI.get(`/api/predicciones/lstm-regressor/${ticker}?horizonte=${horizonteActual}`),
+        ErnestoAPI.get(`/api/mercado/${ticker}?periodo=120`),
+        ErnestoAPI.get(`/api/metricas/comparador/${ticker}`),
+      ]);
+      dibujarGrafico(mercado.datos, pronostico, horizonteActual);
+
+      const metricaRegresor = comparador.modelos.find((m) => m.modelo === "lstm_regressor");
+      if (metricaRegresor) dibujarMetricas(metricaRegresor.metricas);
+    } catch (error) {
+      manejarError(error);
+    }
+  }
+
+  function dibujarGrafico(datosHistoricos, pronostico, horizonte) {
+    const fechasHistoricas = datosHistoricos.map((d) => d.fecha);
+    const preciosHistoricos = datosHistoricos.map((d) => d.close);
+
+    const ultimaFecha = new Date(fechasHistoricas.at(-1));
+    const fechaFutura = new Date(ultimaFecha);
+    fechaFutura.setDate(fechaFutura.getDate() + horizonte);
+
+    const trazoHistorico = {
+      x: fechasHistoricas, y: preciosHistoricos, type: "scatter", mode: "lines",
+      name: "Precio real", line: { color: "#8da3b0", width: 2 },
+    };
+    const trazoPronostico = {
+      x: [fechasHistoricas.at(-1), fechaFutura.toISOString().slice(0, 10)],
+      y: [preciosHistoricos.at(-1), pronostico.precio_predicho],
+      type: "scatter", mode: "lines+markers", name: `Pronóstico (${horizonte}d)`,
+      line: { color: "#b5713c", width: 2, dash: "dash" }, marker: { size: 8 },
+    };
+    const bandaSuperior = {
+      x: [fechasHistoricas.at(-1), fechaFutura.toISOString().slice(0, 10)],
+      y: [preciosHistoricos.at(-1), pronostico.banda_confianza.superior],
+      type: "scatter", mode: "lines", line: { width: 0 }, showlegend: false,
+    };
+    const bandaInferior = {
+      x: [fechasHistoricas.at(-1), fechaFutura.toISOString().slice(0, 10)],
+      y: [preciosHistoricos.at(-1), pronostico.banda_confianza.inferior],
+      type: "scatter", mode: "lines", line: { width: 0 }, fill: "tonexty",
+      fillcolor: "rgba(181,113,60,0.15)", name: "Banda de confianza (95%)",
+    };
+
+    Plotly.newPlot("grafico-pronostico", [trazoHistorico, trazoPronostico, bandaSuperior, bandaInferior], {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+      margin: { t: 10, r: 10, l: 50, b: 30 },
+      xaxis: { gridcolor: "#262d3a" },
+      yaxis: { gridcolor: "#262d3a", title: "Precio (USD)" },
+      legend: { orientation: "h", y: 1.1 },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function dibujarMetricas(metricas) {
+    const grid = document.getElementById("grid-metricas-regresor");
+    const items = [
+      { etiqueta: "RMSE (USD)", valor: metricas.rmse != null ? "$" + metricas.rmse.toFixed(3) : "—" },
+      { etiqueta: "RMSE (%)", valor: metricas.rmse_pct != null ? metricas.rmse_pct.toFixed(2) + "%" : "—" },
+      { etiqueta: "MAE", valor: metricas.mae != null ? metricas.mae.toFixed(3) : "—" },
+      { etiqueta: "R²", valor: metricas.r2 != null ? metricas.r2.toFixed(3) : "—" },
+    ];
+    grid.innerHTML = items.map((i) => `
+      <div class="tarjeta metrica-mini">
+        <div class="valor">${i.valor}</div>
+        <div class="etiqueta">${i.etiqueta}</div>
+      </div>
+    `).join("");
+  }
+
+  function manejarError(error) {
+    if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+      document.getElementById("aviso-api").style.display = "block";
+    }
+    document.getElementById("grafico-pronostico").innerHTML =
+      '<div class="estado-vacio">No hay pronóstico para este ticker/horizonte. Ejecuta el Notebook 04.</div>';
+  }
+</script>
+</body>
+</html>

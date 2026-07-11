@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analítica Global — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 6px; }
+  .cabecera-pagina p { color: var(--color-hueso-tenue); font-size: 14px; margin-bottom: 24px; }
+
+  .grid-analitica { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1000px) { .grid-analitica { grid-template-columns: 1fr; } }
+
+  .tabla-global { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+  .tabla-global th, .tabla-global td { padding: 11px 10px; text-align: left; border-bottom: 1px solid var(--color-veta); }
+  .tabla-global th { color: var(--color-hueso-tenue); font-size: 11.5px; text-transform: uppercase; }
+  .tabla-global td.dato { font-family: var(--fuente-datos); }
+</style>
+</head>
+<body data-pagina="analitica">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Analítica global</h1>
+      <p>Desempeño promedio de cada tipo de modelo, agregando los 5 tickers del proyecto.</p>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="grid-analitica">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">Accuracy promedio por modelo</h3>
+        <div id="grafico-accuracy-global" style="min-height:300px;"></div>
+      </div>
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue);">Detalle</h3>
+        <table class="tabla-global">
+          <thead><tr><th>Modelo</th><th>Tickers</th><th>Accuracy</th><th>F1</th><th>RMSE</th></tr></thead>
+          <tbody id="cuerpo-tabla-global">
+            <tr><td colspan="5"><div class="skeleton" style="height:16px;"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  const NOMBRES = { svc: "SVC", lstm: "LSTM", bilstm: "BiLSTM", gru: "GRU", simplernn: "SimpleRNN", lstm_regressor: "Regresor LSTM" };
+
+  document.addEventListener("DOMContentLoaded", cargarAnalitica);
+
+  async function cargarAnalitica() {
+    try {
+      const { resultados } = await ErnestoAPI.get("/api/metricas/global");
+      dibujarGrafico(resultados);
+      dibujarTabla(resultados);
+    } catch (error) {
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+      document.getElementById("cuerpo-tabla-global").innerHTML =
+        '<tr><td colspan="5" class="estado-vacio">No se pudo cargar la analítica global.</td></tr>';
+    }
+  }
+
+  function dibujarGrafico(resultados) {
+    const clasificadores = resultados.filter((r) => r.accuracy_promedio != null);
+    Plotly.newPlot("grafico-accuracy-global", [{
+      x: clasificadores.map((r) => NOMBRES[r.modelo] || r.modelo),
+      y: clasificadores.map((r) => r.accuracy_promedio),
+      type: "bar", marker: { color: "#b5713c" },
+    }], {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+      margin: { t: 10, r: 10, l: 40, b: 30 },
+      yaxis: { range: [0, 1], gridcolor: "#262d3a" }, xaxis: { gridcolor: "#262d3a" },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function dibujarTabla(resultados) {
+    document.getElementById("cuerpo-tabla-global").innerHTML = resultados.map((r) => `
+      <tr>
+        <td>${NOMBRES[r.modelo] || r.modelo}</td>
+        <td class="dato">${r.tickers_evaluados}</td>
+        <td class="dato">${r.accuracy_promedio != null ? (r.accuracy_promedio * 100).toFixed(1) + "%" : "—"}</td>
+        <td class="dato">${r.f1_promedio != null ? (r.f1_promedio * 100).toFixed(1) + "%" : "—"}</td>
+        <td class="dato">${r.rmse_promedio != null ? "$" + r.rmse_promedio.toFixed(3) : "—"}</td>
+      </tr>
+    `).join("");
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clasificador SVC — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  .cabecera-pagina { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+
+  .panel-semaforo { text-align: center; padding: 32px 20px; }
+  .semaforo-senal { font-family: var(--fuente-datos); font-size: 34px; font-weight: 700; margin: 10px 0; }
+  .semaforo-senal.buy { color: var(--color-buy); }
+  .semaforo-senal.sell { color: var(--color-sell); }
+  .semaforo-probabilidad { font-size: 13px; color: var(--color-hueso-tenue); }
+
+  .grid-svc { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; margin-top: 18px; }
+  @media (max-width: 1000px) { .grid-svc { grid-template-columns: 1fr; } }
+
+  .grid-metricas-svc { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+  .metrica-mini { text-align: center; padding: 12px 6px; }
+  .metrica-mini .valor { font-family: var(--fuente-datos); font-size: 18px; font-weight: 600; }
+  .metrica-mini .etiqueta { font-size: 10.5px; color: var(--color-hueso-debil); margin-top: 3px; }
+
+  .hiperparametros-svc { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .chip-hp { font-family: var(--fuente-datos); font-size: 11.5px; background: var(--color-roca-clara); padding: 4px 10px; border-radius: 100px; color: var(--color-plata-suave); }
+</style>
+</head>
+<body data-pagina="svc">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Clasificador SVC</h1>
+      <select id="selector-ticker">
+        <option value="FSM">FSM</option>
+        <option value="VOLCABC1.LM">VOLCABC1.LM</option>
+        <option value="ABX.TO">ABX.TO</option>
+        <option value="BVN" selected>BVN</option>
+        <option value="BHP">BHP</option>
+      </select>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="tarjeta panel-semaforo" id="panel-semaforo">
+      <div style="font-size:12px; color:var(--color-hueso-debil); text-transform:uppercase; letter-spacing:0.06em;">Señal actual</div>
+      <div class="skeleton" style="height:34px; width:120px; margin:14px auto;"></div>
+    </div>
+
+    <div class="grid-svc">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:10px;">Métricas del modelo</h3>
+        <div class="grid-metricas-svc" id="grid-metricas-svc">
+          <div class="skeleton" style="height:60px;"></div>
+          <div class="skeleton" style="height:60px;"></div>
+          <div class="skeleton" style="height:60px;"></div>
+          <div class="skeleton" style="height:60px;"></div>
+        </div>
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin:20px 0 6px;">Hiperparámetros (GridSearchCV)</h3>
+        <div class="hiperparametros-svc" id="hiperparametros-svc"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">Matriz de confusión</h3>
+        <div id="grafico-matriz" style="min-height:280px;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    cargarSvc();
+    document.getElementById("selector-ticker").addEventListener("change", cargarSvc);
+  });
+
+  async function cargarSvc() {
+    const ticker = document.getElementById("selector-ticker").value;
+    try {
+      const [prediccion, comparador] = await Promise.all([
+        ErnestoAPI.get(`/api/predicciones/svc/${ticker}`),
+        ErnestoAPI.get(`/api/metricas/comparador/${ticker}`),
+      ]);
+      const metricasSvc = comparador.modelos.find((m) => m.modelo === "svc");
+
+      dibujarSemaforo(prediccion);
+      if (metricasSvc) {
+        dibujarMetricas(metricasSvc.metricas);
+        dibujarHiperparametros(metricasSvc.hiperparametros);
+        dibujarMatrizConfusion(metricasSvc.matriz_confusion);
+      }
+    } catch (error) {
+      manejarError(error);
+    }
+  }
+
+  function dibujarSemaforo(prediccion) {
+    const panel = document.getElementById("panel-semaforo");
+    const esBuy = prediccion.senal === "BUY";
+    panel.innerHTML = `
+      <div style="font-size:12px; color:var(--color-hueso-debil); text-transform:uppercase; letter-spacing:0.06em;">Señal actual — ${prediccion.ticker}</div>
+      <div class="semaforo-senal ${esBuy ? "buy" : "sell"}">${prediccion.senal}</div>
+      <div class="semaforo-probabilidad">Confianza del modelo: ${(prediccion.probabilidad * 100).toFixed(1)}%</div>
+    `;
+  }
+
+  function dibujarMetricas(metricas) {
+    const grid = document.getElementById("grid-metricas-svc");
+    const items = [
+      { etiqueta: "Accuracy", valor: metricas.accuracy },
+      { etiqueta: "Precision", valor: metricas.precision },
+      { etiqueta: "Recall", valor: metricas.recall },
+      { etiqueta: "F1-score", valor: metricas.f1 },
+    ];
+    grid.innerHTML = items.map((i) => `
+      <div class="tarjeta metrica-mini">
+        <div class="valor">${i.valor != null ? (i.valor * 100).toFixed(1) + "%" : "—"}</div>
+        <div class="etiqueta">${i.etiqueta}</div>
+      </div>
+    `).join("");
+  }
+
+  function dibujarHiperparametros(hp) {
+    document.getElementById("hiperparametros-svc").innerHTML = Object.entries(hp).map(([clave, valor]) => `
+      <span class="chip-hp">${clave} = ${valor}</span>
+    `).join("");
+  }
+
+  function dibujarMatrizConfusion(matriz) {
+    if (!matriz) return;
+    Plotly.newPlot("grafico-matriz", [{
+      z: matriz, x: ["Predicho SELL", "Predicho BUY"], y: ["Real SELL", "Real BUY"],
+      type: "heatmap", colorscale: [[0, "#1b2029"], [1, "#b5713c"]],
+      texttemplate: "%{z}", showscale: false,
+    }], {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 12 },
+      margin: { t: 10, r: 10, l: 80, b: 40 },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function manejarError(error) {
+    if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+      document.getElementById("aviso-api").style.display = "block";
+    }
+    document.getElementById("panel-semaforo").innerHTML =
+      '<div class="estado-vacio">No hay predicciones SVC para este ticker. Ejecuta el Notebook 02.</div>';
+  }
+</script>
+</body>
+</html>

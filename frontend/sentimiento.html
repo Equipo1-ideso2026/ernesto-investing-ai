@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentimiento de Noticias — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  .cabecera-pagina { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+
+  .grid-sentimiento { display: grid; grid-template-columns: 1fr 1.4fr; gap: 18px; }
+  @media (max-width: 1000px) { .grid-sentimiento { grid-template-columns: 1fr; } }
+
+  .tarjeta-noticia { padding: 14px 16px; border-bottom: 1px solid var(--color-veta); }
+  .tarjeta-noticia:last-child { border-bottom: none; }
+  .tarjeta-noticia .titular { font-size: 13.5px; margin-bottom: 6px; }
+  .tarjeta-noticia .meta { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--color-hueso-debil); }
+  .insignia-bullish { background: var(--color-buy-fondo); color: var(--color-buy); }
+  .insignia-bearish { background: var(--color-sell-fondo); color: var(--color-sell); }
+  .insignia-neutral { background: var(--color-roca-clara); color: var(--color-hueso-tenue); }
+</style>
+</head>
+<body data-pagina="sentimiento">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Sentimiento de noticias</h1>
+      <select id="selector-ticker">
+        <option value="FSM">FSM</option>
+        <option value="VOLCABC1.LM">VOLCABC1.LM</option>
+        <option value="ABX.TO">ABX.TO</option>
+        <option value="BVN" selected>BVN</option>
+        <option value="BHP">BHP</option>
+      </select>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="grid-sentimiento">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">Distribución de sentimiento</h3>
+        <div id="grafico-sentimiento" style="min-height:280px;"></div>
+      </div>
+
+      <div class="tarjeta" style="padding: 6px 0;">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); padding: 14px 16px 0;">Titulares analizados</h3>
+        <div id="lista-noticias">
+          <div style="padding:14px 16px;"><div class="skeleton" style="height:16px;"></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    cargarSentimiento();
+    document.getElementById("selector-ticker").addEventListener("change", cargarSentimiento);
+  });
+
+  async function cargarSentimiento() {
+    const ticker = document.getElementById("selector-ticker").value;
+    try {
+      const datos = await ErnestoAPI.get(`/api/sentimiento/${ticker}`);
+      dibujarGrafico(datos.conteo);
+      dibujarLista(datos.noticias);
+    } catch (error) {
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+      document.getElementById("lista-noticias").innerHTML =
+        '<div class="estado-vacio" style="padding:20px;">No hay noticias analizadas. Ejecuta el Notebook 05.</div>';
+    }
+  }
+
+  function dibujarGrafico(conteo) {
+    Plotly.newPlot("grafico-sentimiento", [{
+      values: [conteo.BULLISH, conteo.NEUTRAL, conteo.BEARISH],
+      labels: ["Bullish", "Neutral", "Bearish"],
+      type: "pie", hole: 0.55,
+      marker: { colors: ["#3f9463", "#8da3b0", "#c25b52"] },
+      textfont: { color: "#e9e6e0" },
+    }], {
+      paper_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 12 },
+      margin: { t: 10, r: 10, l: 10, b: 10 },
+      showlegend: true, legend: { orientation: "h", y: -0.1 },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function dibujarLista(noticias) {
+    const clases = { BULLISH: "insignia-bullish", BEARISH: "insignia-bearish", NEUTRAL: "insignia-neutral" };
+    document.getElementById("lista-noticias").innerHTML = noticias.map((n) => `
+      <div class="tarjeta-noticia">
+        <div class="titular">${n.titular}</div>
+        <div class="meta">
+          <span>${n.fuente} · ${new Date(n.fecha).toLocaleDateString("es-PE")}</span>
+          <span class="insignia ${clases[n.clasificacion]}">${n.clasificacion} (${n.compound.toFixed(2)})</span>
+        </div>
+      </div>
+    `).join("");
+  }
+</script>
+</body>
+</html>

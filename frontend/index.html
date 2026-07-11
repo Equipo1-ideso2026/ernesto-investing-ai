@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ernesto Investing AI — Iniciar sesión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  body { min-height: 100vh; }
+  .pagina-login {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+  }
+  .panel-hero {
+    position: relative;
+    padding: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .panel-hero .marca { display: flex; align-items: center; gap: 12px; z-index: 1; }
+  .panel-hero .marca .isotipo { width: 42px; height: 42px; font-size: 15px; }
+  .panel-hero .tesis { max-width: 480px; z-index: 1; }
+  .panel-hero .tesis h1 {
+    font-size: 40px;
+    line-height: 1.12;
+    margin-bottom: 18px;
+  }
+  .panel-hero .tesis p { color: var(--color-hueso-tenue); font-size: 15.5px; line-height: 1.6; }
+  .panel-hero .tickers {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; z-index: 1;
+  }
+  .ticker-chip {
+    font-family: var(--fuente-datos);
+    font-size: 12.5px;
+    background: rgba(233, 230, 224, 0.06);
+    border: 1px solid var(--color-veta);
+    padding: 6px 12px;
+    border-radius: 100px;
+    color: var(--color-plata-suave);
+  }
+  .panel-hero .pie-hero { z-index: 1; font-size: 12.5px; color: var(--color-hueso-debil); }
+
+  .panel-formulario {
+    background: var(--color-roca);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  .caja-formulario { width: 100%; max-width: 380px; }
+  .caja-formulario h2 { font-size: 24px; margin-bottom: 6px; }
+  .caja-formulario .subtitulo { color: var(--color-hueso-tenue); font-size: 14px; margin-bottom: 28px; }
+
+  .alternar-form { text-align: center; font-size: 13.5px; color: var(--color-hueso-tenue); margin-top: 18px; }
+  .alternar-form a { color: var(--color-cobre-suave); font-weight: 600; }
+
+  details.config-api {
+    margin-top: 28px;
+    border-top: 1px solid var(--color-veta);
+    padding-top: 16px;
+  }
+  details.config-api summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--color-hueso-debil);
+    list-style: none;
+  }
+  details.config-api summary::-webkit-details-marker { display: none; }
+  .fila-api { display: flex; gap: 8px; margin-top: 10px; }
+  .fila-api input { flex: 1; }
+  .fila-api button { flex-shrink: 0; }
+
+  @media (max-width: 860px) {
+    .pagina-login { grid-template-columns: 1fr; }
+    .panel-hero { display: none; }
+  }
+</style>
+</head>
+<body data-pagina="login">
+
+<div class="pagina-login">
+  <section class="panel-hero fondo-estratos">
+    <div class="marca">
+      <div class="isotipo">EI</div>
+      <div class="texto">
+        <strong style="font-family: var(--fuente-display); font-size:16px;">Ernesto Investing AI</strong>
+      </div>
+    </div>
+
+    <div class="tesis">
+      <h1>Cinco años de datos de mercado, leídos como estratos.</h1>
+      <p>
+        Sistema de apoyo a decisiones de inversión bursátil que combina
+        un clasificador SVC, cuatro arquitecturas de redes neuronales
+        recurrentes y un regresor LSTM para leer la tendencia real detrás
+        del ruido diario del precio.
+      </p>
+      <div class="tickers">
+        <span class="ticker-chip">FSM</span>
+        <span class="ticker-chip">VOLCABC1.LM</span>
+        <span class="ticker-chip">ABX.TO</span>
+        <span class="ticker-chip">BVN</span>
+        <span class="ticker-chip">BHP</span>
+      </div>
+    </div>
+
+    <div class="pie-hero">iDeSo · UNMSM · FISI — Proyecto Final 2026-II</div>
+  </section>
+
+  <section class="panel-formulario">
+    <div class="caja-formulario">
+
+      <div id="panel-login">
+        <h2>Bienvenido de nuevo</h2>
+        <p class="subtitulo">Ingresa a tu cuenta para ver las señales del mercado.</p>
+
+        <div class="mensaje-error" id="error-login" style="display:none;"></div>
+
+        <form id="formulario-login">
+          <div class="campo">
+            <label for="login-username">Usuario</label>
+            <input type="text" id="login-username" name="username" required autocomplete="username">
+          </div>
+          <div class="campo">
+            <label for="login-password">Contraseña</label>
+            <input type="password" id="login-password" name="password" required autocomplete="current-password">
+          </div>
+          <button type="submit" class="boton boton-primario" style="width:100%; padding:12px;">Iniciar sesión</button>
+        </form>
+
+        <p class="alternar-form">¿No tienes cuenta? <a href="#" id="ir-a-registro">Crea una aquí</a></p>
+      </div>
+
+      <div id="panel-registro" style="display:none;">
+        <h2>Crea tu cuenta</h2>
+        <p class="subtitulo">Un usuario dedicado al proyecto, separado de tu cuenta personal.</p>
+
+        <div class="mensaje-error" id="error-registro" style="display:none;"></div>
+
+        <form id="formulario-registro">
+          <div class="campo">
+            <label for="reg-nombre">Nombre completo</label>
+            <input type="text" id="reg-nombre" name="nombre_completo" required>
+          </div>
+          <div class="campo">
+            <label for="reg-email">Correo electrónico</label>
+            <input type="email" id="reg-email" name="email" required autocomplete="email">
+          </div>
+          <div class="campo">
+            <label for="reg-username">Usuario</label>
+            <input type="text" id="reg-username" name="username" required minlength="3" autocomplete="username">
+          </div>
+          <div class="campo">
+            <label for="reg-password">Contraseña</label>
+            <input type="password" id="reg-password" name="password" required minlength="6" autocomplete="new-password">
+          </div>
+          <div class="campo">
+            <label for="reg-confirmar">Confirmar contraseña</label>
+            <input type="password" id="reg-confirmar" name="confirmar_password" required minlength="6" autocomplete="new-password">
+          </div>
+          <button type="submit" class="boton boton-primario" style="width:100%; padding:12px;">Crear cuenta</button>
+        </form>
+
+        <p class="alternar-form">¿Ya tienes cuenta? <a href="#" id="ir-a-login">Inicia sesión</a></p>
+      </div>
+
+      <details class="config-api">
+        <summary>Configuración avanzada — URL de la API</summary>
+        <div class="fila-api">
+          <input type="text" id="input-api-url" placeholder="https://xxxx.ngrok-free.app">
+          <button type="button" id="boton-guardar-api-url" class="boton boton-secundario">Guardar URL</button>
+        </div>
+      </details>
+
+    </div>
+  </section>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+</body>
+</html>

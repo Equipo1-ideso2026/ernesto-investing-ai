@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalle de Ticker — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  .cabecera-ticker { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-ticker .volver { font-size: 12.5px; color: var(--color-hueso-debil); margin-bottom: 8px; display: inline-block; }
+  .cabecera-ticker h1 { font-size: 30px; font-family: var(--fuente-datos); }
+  .cabecera-ticker .nombre-empresa { color: var(--color-hueso-tenue); font-size: 14px; margin-top: 4px; }
+  .precio-actual { font-family: var(--fuente-datos); font-size: 32px; text-align: right; }
+
+  .grid-resumen-consolidado { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .grid-resumen-consolidado { grid-template-columns: repeat(2, 1fr); } }
+  .tarjeta-resumen { text-align: center; padding: 16px 10px; }
+  .tarjeta-resumen .etiqueta { font-size: 11px; color: var(--color-hueso-debil); text-transform: uppercase; margin-bottom: 8px; }
+  .tarjeta-resumen .valor-resumen { font-family: var(--fuente-datos); font-size: 18px; font-weight: 600; }
+
+  .grid-detalle { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+  @media (max-width: 1000px) { .grid-detalle { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-pagina="ticker-detalle">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-ticker">
+      <div>
+        <a href="mercado.html" class="volver">← Volver a Mercado</a>
+        <h1 id="titulo-ticker">—</h1>
+        <div class="nombre-empresa" id="nombre-empresa"></div>
+      </div>
+      <div style="text-align:right;">
+        <div class="precio-actual" id="precio-actual">—</div>
+        <button id="boton-exportar-pdf" class="boton boton-secundario" style="margin-top:10px;">
+          Descargar reporte PDF
+        </button>
+      </div>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="grid-resumen-consolidado" id="grid-resumen-consolidado">
+      <div class="tarjeta"><div class="skeleton" style="height:50px;"></div></div>
+      <div class="tarjeta"><div class="skeleton" style="height:50px;"></div></div>
+      <div class="tarjeta"><div class="skeleton" style="height:50px;"></div></div>
+      <div class="tarjeta"><div class="skeleton" style="height:50px;"></div></div>
+    </div>
+
+    <div class="grid-detalle">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">Precio — últimos 90 días</h3>
+        <div id="grafico-detalle" style="min-height:340px;"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">Consenso de modelos</h3>
+        <div id="lista-consenso"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  const NOMBRES_EMPRESA = {
+    FSM: "Fortuna Silver Mines Inc.", "VOLCABC1.LM": "Volcan Compañía Minera S.A.A.",
+    "ABX.TO": "Barrick Gold Corporation", BVN: "Compañía de Minas Buenaventura S.A.A.",
+    BHP: "BHP Billiton Limited",
+  };
+  const NOMBRES_MODELO = { svc: "SVC", lstm: "LSTM", bilstm: "BiLSTM", gru: "GRU", simplernn: "SimpleRNN" };
+
+  let datosConsolidados = null;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const ticker = new URLSearchParams(window.location.search).get("ticker") || "BVN";
+    document.getElementById("titulo-ticker").textContent = ticker;
+    document.getElementById("nombre-empresa").textContent = NOMBRES_EMPRESA[ticker] || "";
+    cargarDetalle(ticker);
+
+    document.getElementById("boton-exportar-pdf").addEventListener("click", () => exportarPDF(ticker));
+  });
+
+  async function cargarDetalle(ticker) {
+    try {
+      const [mercado, comparador, pronostico, sentimiento] = await Promise.all([
+        ErnestoAPI.get(`/api/mercado/${ticker}?periodo=90`),
+        ErnestoAPI.get(`/api/metricas/comparador/${ticker}`).catch(() => ({ modelos: [] })),
+        ErnestoAPI.get(`/api/predicciones/lstm-regressor/${ticker}?horizonte=30`).catch(() => null),
+        ErnestoAPI.get(`/api/sentimiento/${ticker}`).catch(() => null),
+      ]);
+
+      const predicciones = await Promise.all(
+        Object.keys(NOMBRES_MODELO).map((m) =>
+          ErnestoAPI.get(`/api/predicciones/rnn/${ticker}?modelo=${m}`)
+            .then((r) => r.predicciones[0])
+            .catch(() => null)
+        )
+      );
+
+      datosConsolidados = { ticker, mercado, comparador, pronostico, sentimiento, predicciones: predicciones.filter(Boolean) };
+
+      dibujarPrecioActual(mercado.datos.at(-1), mercado.datos.at(-2));
+      dibujarResumen(datosConsolidados);
+      dibujarGrafico(mercado.datos);
+      dibujarConsenso(datosConsolidados);
+    } catch (error) {
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+    }
+  }
+
+  function dibujarPrecioActual(ultimo, anterior) {
+    if (!ultimo) return;
+    const variacion = anterior ? ((ultimo.close - anterior.close) / anterior.close) * 100 : 0;
+    document.getElementById("precio-actual").innerHTML =
+      `$${ultimo.close.toFixed(2)} <span style="font-size:14px; color:${variacion >= 0 ? "var(--color-buy)" : "var(--color-sell)"};">${variacion >= 0 ? "+" : ""}${variacion.toFixed(2)}%</span>`;
+  }
+
+  function dibujarResumen(datos) {
+    const svc = datos.predicciones.find((p) => p.modelo === "svc") || datos.comparador.modelos.find((m) => m.modelo === "svc");
+    const buys = datos.predicciones.filter((p) => p.senal === "BUY").length;
+    const consenso = buys >= datos.predicciones.length / 2 ? "BUY" : "SELL";
+
+    document.getElementById("grid-resumen-consolidado").innerHTML = `
+      <div class="tarjeta tarjeta-resumen">
+        <div class="etiqueta">Consenso RNN</div>
+        <div class="valor-resumen" style="color:${consenso === "BUY" ? "var(--color-buy)" : "var(--color-sell)"};">${consenso}</div>
+      </div>
+      <div class="tarjeta tarjeta-resumen">
+        <div class="etiqueta">Pronóstico 30d</div>
+        <div class="valor-resumen">${datos.pronostico ? "$" + datos.pronostico.precio_predicho.toFixed(2) : "—"}</div>
+      </div>
+      <div class="tarjeta tarjeta-resumen">
+        <div class="etiqueta">Sentimiento</div>
+        <div class="valor-resumen">${datos.sentimiento ? (datos.sentimiento.promedio_compound > 0 ? "Positivo" : "Negativo") : "—"}</div>
+      </div>
+      <div class="tarjeta tarjeta-resumen">
+        <div class="etiqueta">Modelos activos</div>
+        <div class="valor-resumen">${datos.predicciones.length}/4 RNN</div>
+      </div>
+    `;
+  }
+
+  function dibujarGrafico(datos) {
+    Plotly.newPlot("grafico-detalle", [{
+      x: datos.map((d) => d.fecha), y: datos.map((d) => d.close),
+      type: "scatter", mode: "lines", line: { color: "#b5713c", width: 2 }, fill: "tozeroy", fillcolor: "rgba(181,113,60,0.08)",
+    }], {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+      margin: { t: 10, r: 10, l: 45, b: 30 },
+      xaxis: { gridcolor: "#262d3a" }, yaxis: { gridcolor: "#262d3a" },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function dibujarConsenso(datos) {
+    document.getElementById("lista-consenso").innerHTML = datos.predicciones.map((p) => `
+      <div class="fila-ticker">
+        <span>${NOMBRES_MODELO[p.modelo]}</span>
+        <span class="insignia ${p.senal === "BUY" ? "insignia-buy" : "insignia-sell"}">${p.senal} · ${(p.probabilidad * 100).toFixed(0)}%</span>
+      </div>
+    `).join("") || '<div class="estado-vacio">Sin predicciones RNN todavía.</div>';
+  }
+
+  async function exportarPDF(ticker) {
+    if (!datosConsolidados) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text(`Reporte — ${ticker}`, 14, 18);
+    doc.setFontSize(10);
+    doc.text(`${NOMBRES_EMPRESA[ticker] || ""} — generado el ${new Date().toLocaleString("es-PE")}`, 14, 25);
+
+    doc.setFontSize(11);
+    let y = 38;
+    const ultimo = datosConsolidados.mercado.datos.at(-1);
+    doc.text(`Precio de cierre mas reciente: $${ultimo?.close?.toFixed(2) ?? "N/D"}`, 14, y); y += 7;
+    if (datosConsolidados.pronostico) {
+      doc.text(`Pronostico LSTM a 30 dias: $${datosConsolidados.pronostico.precio_predicho.toFixed(2)}`, 14, y); y += 7;
+    }
+    doc.text("Senales de clasificadores RNN:", 14, y); y += 7;
+    datosConsolidados.predicciones.forEach((p) => {
+      doc.text(`  - ${NOMBRES_MODELO[p.modelo]}: ${p.senal} (confianza ${(p.probabilidad * 100).toFixed(0)}%)`, 14, y);
+      y += 6;
+    });
+
+    try {
+      const grafico = document.getElementById("grafico-detalle");
+      const imagenBase64 = await Plotly.toImage(grafico, { format: "png", width: 700, height: 320 });
+      doc.addImage(imagenBase64, "PNG", 14, y + 6, 180, 82);
+    } catch (_error) {
+      // Si falla la captura del grafico, el PDF se guarda solo con el resumen textual
+    }
+
+    doc.save(`reporte_${ticker}.pdf`);
+  }
+</script>
+</body>
+</html>

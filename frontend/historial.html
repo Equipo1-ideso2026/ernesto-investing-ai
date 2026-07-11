@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Historial — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+  .controles { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .tabla-historial { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .tabla-historial th, .tabla-historial td { padding: 11px 10px; text-align: left; border-bottom: 1px solid var(--color-veta); }
+  .tabla-historial th { color: var(--color-hueso-tenue); font-size: 11.5px; text-transform: uppercase; }
+  .tabla-historial td.dato { font-family: var(--fuente-datos); }
+</style>
+</head>
+<body data-pagina="historial">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Historial de predicciones</h1>
+      <div class="controles">
+        <select id="selector-ticker">
+          <option value="FSM">FSM</option>
+          <option value="VOLCABC1.LM">VOLCABC1.LM</option>
+          <option value="ABX.TO">ABX.TO</option>
+          <option value="BVN" selected>BVN</option>
+          <option value="BHP">BHP</option>
+        </select>
+        <input type="date" id="input-desde">
+        <span style="color:var(--color-hueso-debil); font-size:13px;">hasta</span>
+        <input type="date" id="input-hasta">
+        <button id="boton-filtrar" class="boton boton-primario">Filtrar</button>
+      </div>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="tarjeta">
+      <table class="tabla-historial">
+        <thead><tr><th>Fecha</th><th>Modelo</th><th>Tipo</th><th>Resultado</th></tr></thead>
+        <tbody id="cuerpo-tabla-historial">
+          <tr><td colspan="4"><div class="skeleton" style="height:16px;"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const hoy = new Date();
+    const hace30dias = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+    document.getElementById("input-hasta").value = hoy.toISOString().slice(0, 10);
+    document.getElementById("input-desde").value = hace30dias.toISOString().slice(0, 10);
+
+    cargarHistorial();
+    document.getElementById("boton-filtrar").addEventListener("click", cargarHistorial);
+    document.getElementById("selector-ticker").addEventListener("change", cargarHistorial);
+  });
+
+  let controladorActual = null;
+
+  async function cargarHistorial() {
+    controladorActual?.abort();
+    controladorActual = new AbortController();
+
+    const ticker = document.getElementById("selector-ticker").value;
+    const desde = document.getElementById("input-desde").value;
+    const hasta = document.getElementById("input-hasta").value;
+    const cuerpo = document.getElementById("cuerpo-tabla-historial");
+
+    try {
+      const { resultados } = await ErnestoAPI.get(
+        `/api/historial/${ticker}?desde=${desde}&hasta=${hasta}`,
+        { signal: controladorActual.signal }
+      );
+      if (!resultados.length) {
+        cuerpo.innerHTML = '<tr><td colspan="4" class="estado-vacio">Sin registros en ese rango de fechas.</td></tr>';
+        return;
+      }
+      cuerpo.innerHTML = resultados.map((r) => {
+        const resultado = r.senal
+          ? `<span class="insignia ${r.senal === "BUY" ? "insignia-buy" : "insignia-sell"}">${r.senal} (${(r.probabilidad * 100).toFixed(0)}%)</span>`
+          : `$${r.precio_predicho?.toFixed(2)} a ${r.horizonte_dias}d`;
+        return `
+          <tr>
+            <td class="dato">${new Date(r.fecha_generacion).toLocaleString("es-PE")}</td>
+            <td>${r.modelo.toUpperCase()}</td>
+            <td>${r.tipo === "clasificacion" ? "Clasificación" : "Regresión"}</td>
+            <td>${resultado}</td>
+          </tr>
+        `;
+      }).join("");
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+      cuerpo.innerHTML = '<tr><td colspan="4" class="estado-vacio">No se pudo cargar el historial.</td></tr>';
+    }
+  }
+</script>
+</body>
+</html>

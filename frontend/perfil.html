@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 22px; }
+  .tarjeta-perfil { max-width: 480px; }
+  .avatar-grande {
+    width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, var(--color-cobre), var(--color-cobre-suave));
+    display: flex; align-items: center; justify-content: center; font-family: var(--fuente-display); font-size: 28px; color: #17110a;
+    margin-bottom: 18px;
+  }
+  .watchlist-resumen { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .chip-resumen { font-family: var(--fuente-datos); font-size: 12px; background: var(--color-roca-clara); padding: 4px 10px; border-radius: 100px; }
+</style>
+</head>
+<body data-pagina="perfil">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina"><h1>Perfil</h1></div>
+
+    <div class="tarjeta tarjeta-perfil">
+      <div class="avatar-grande" id="avatar-grande">?</div>
+
+      <div id="mensaje-perfil" style="display:none;"></div>
+
+      <form id="formulario-perfil">
+        <div class="campo">
+          <label for="perfil-nombre">Nombre completo</label>
+          <input type="text" id="perfil-nombre" name="nombre_completo" required>
+        </div>
+        <div class="campo">
+          <label>Correo electrónico</label>
+          <input type="email" id="perfil-email" disabled>
+        </div>
+        <div class="campo">
+          <label>Usuario</label>
+          <input type="text" id="perfil-username" disabled>
+        </div>
+        <button type="submit" class="boton boton-primario">Guardar cambios</button>
+      </form>
+
+      <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--color-veta);">
+        <label style="display:block; font-size:12.5px; color:var(--color-hueso-tenue); margin-bottom:8px;">Tu watchlist</label>
+        <div class="watchlist-resumen" id="watchlist-resumen"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const usuario = ErnestoAPI.obtenerUsuario();
+    if (!usuario) return;
+
+    document.getElementById("avatar-grande").textContent = usuario.nombre_completo.charAt(0).toUpperCase();
+    document.getElementById("perfil-nombre").value = usuario.nombre_completo;
+    document.getElementById("perfil-email").value = usuario.email;
+    document.getElementById("perfil-username").value = "@" + usuario.username;
+
+    document.getElementById("watchlist-resumen").innerHTML = usuario.watchlist.length
+      ? usuario.watchlist.map((t) => `<span class="chip-resumen">${t}</span>`).join("")
+      : '<span style="font-size:12.5px; color:var(--color-hueso-debil);">Sin tickers guardados aún.</span>';
+
+    document.getElementById("formulario-perfil").addEventListener("submit", guardarPerfil);
+  });
+
+  async function guardarPerfil(evento) {
+    evento.preventDefault();
+    const mensaje = document.getElementById("mensaje-perfil");
+    try {
+      const usuarioActualizado = await ErnestoAPI.put("/api/auth/perfil", {
+        nombre_completo: document.getElementById("perfil-nombre").value.trim(),
+      });
+      ErnestoAPI.actualizarUsuario(usuarioActualizado);
+      mensaje.className = "mensaje-exito";
+      mensaje.textContent = "Perfil actualizado correctamente.";
+      mensaje.style.display = "block";
+    } catch (error) {
+      mensaje.className = "mensaje-error";
+      mensaje.textContent = error.message || "No se pudo actualizar el perfil.";
+      mensaje.style.display = "block";
+    }
+  }
+</script>
+</body>
+</html>

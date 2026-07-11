@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ayuda — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 6px; }
+  .cabecera-pagina p { color: var(--color-hueso-tenue); font-size: 14px; margin-bottom: 24px; }
+  .tarjeta-faq { max-width: 720px; margin-bottom: 12px; }
+  .tarjeta-faq summary { cursor: pointer; font-size: 14.5px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+  .tarjeta-faq summary::-webkit-details-marker { display: none; }
+  .tarjeta-faq summary::after { content: "+"; color: var(--color-cobre-suave); font-size: 18px; }
+  .tarjeta-faq[open] summary::after { content: "–"; }
+  .tarjeta-faq .respuesta { margin-top: 12px; font-size: 13.5px; color: var(--color-hueso-tenue); line-height: 1.6; }
+</style>
+</head>
+<body data-pagina="ayuda">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Ayuda</h1>
+      <p>Preguntas frecuentes sobre el uso del sistema.</p>
+    </div>
+
+    <details class="tarjeta tarjeta-faq" open>
+      <summary>La API no conecta, ¿qué hago?</summary>
+      <div class="respuesta">
+        Cada vez que reinicias el Notebook 06 en Google Colab, ngrok genera una URL nueva.
+        Ve a <a href="configuracion.html" style="color:var(--color-cobre-suave);">Configuración</a>,
+        pega la URL actual (la que imprime la celda 6 del notebook, termina en <span class="dato">.ngrok-free.app</span>)
+        y guarda. La conexión se verifica automáticamente.
+      </div>
+    </details>
+
+    <details class="tarjeta tarjeta-faq">
+      <summary>¿Qué significa la señal BUY/SELL de cada modelo?</summary>
+      <div class="respuesta">
+        Cada uno de los 5 clasificadores (SVC, LSTM, BiLSTM, GRU, SimpleRNN) analiza el mismo ticker
+        de forma independiente y predice si el precio de cierre del día siguiente subirá (BUY) o
+        bajará (SELL), junto con su nivel de confianza. El Ranking combina las 5 señales en un
+        consenso único.
+      </div>
+    </details>
+
+    <details class="tarjeta tarjeta-faq">
+      <summary>¿Por qué algunos datos no aparecen?</summary>
+      <div class="respuesta">
+        Cada módulo depende de un notebook específico ya ejecutado: Mercado necesita el Notebook 01,
+        SVC el Notebook 02, RNNs los Notebooks 03/03b, el Regresor LSTM el Notebook 04, y Sentimiento
+        el Notebook 05. Si un módulo muestra "sin datos", significa que ese notebook aún no corrió
+        para ese ticker.
+      </div>
+    </details>
+
+    <details class="tarjeta tarjeta-faq">
+      <summary>¿Los datos son reales?</summary>
+      <div class="respuesta">
+        Los precios de mercado son reales, descargados de Yahoo Finance. Las predicciones son
+        generadas por modelos de IA entrenados con esos datos reales. Las noticias del módulo de
+        Sentimiento son simuladas de forma realista (autorizado explícitamente por la especificación
+        del curso), ya que no se integra una API de noticias en tiempo real.
+      </div>
+    </details>
+
+    <details class="tarjeta tarjeta-faq">
+      <summary>¿Cómo agrego un ticker a mi Watchlist?</summary>
+      <div class="respuesta">
+        Ve a la sección Watchlist en el menú lateral y haz clic sobre cualquiera de los 5 tickers
+        disponibles para agregarlo o quitarlo. Se guarda en tu cuenta, no en este navegador.
+      </div>
+    </details>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+</body>
+</html>

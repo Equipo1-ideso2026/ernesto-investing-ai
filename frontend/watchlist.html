@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watchlist — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 6px; }
+  .cabecera-pagina p { color: var(--color-hueso-tenue); font-size: 14px; margin-bottom: 24px; }
+
+  .grid-tickers-disponibles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 26px; }
+  .chip-ticker-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 14px; border-radius: 100px; font-family: var(--fuente-datos); font-size: 13px;
+    background: var(--color-roca); border: 1px solid var(--color-veta); cursor: pointer; color: var(--color-hueso-tenue);
+  }
+  .chip-ticker-toggle.activo { background: rgba(181,113,60,0.14); border-color: var(--color-cobre); color: var(--color-cobre-suave); }
+
+  .grid-watchlist { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 900px) { .grid-watchlist { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .grid-watchlist { grid-template-columns: 1fr; } }
+
+  .tarjeta-watchlist .cabecera-tarjeta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .tarjeta-watchlist .ticker-nombre { font-family: var(--fuente-datos); font-weight: 700; font-size: 16px; }
+  .tarjeta-watchlist .precio { font-family: var(--fuente-datos); font-size: 22px; margin: 6px 0; }
+</style>
+</head>
+<body data-pagina="watchlist">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Watchlist</h1>
+      <p>Selecciona los tickers que quieres seguir de cerca.</p>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="grid-tickers-disponibles" id="chips-tickers"></div>
+
+    <div class="grid-watchlist" id="grid-watchlist">
+      <div class="tarjeta"><div class="skeleton" style="height:100px;"></div></div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  const TICKERS = ["FSM", "VOLCABC1.LM", "ABX.TO", "BVN", "BHP"];
+
+  document.addEventListener("DOMContentLoaded", () => {
+    dibujarChips();
+    cargarWatchlist();
+  });
+
+  function dibujarChips() {
+    const usuario = ErnestoAPI.obtenerUsuario();
+    const watchlist = usuario?.watchlist || [];
+    document.getElementById("chips-tickers").innerHTML = TICKERS.map((t) => `
+      <div class="chip-ticker-toggle ${watchlist.includes(t) ? "activo" : ""}" data-ticker="${t}">
+        ${watchlist.includes(t) ? "★" : "☆"} ${t}
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".chip-ticker-toggle").forEach((chip) => {
+      chip.addEventListener("click", () => alternarTicker(chip));
+    });
+  }
+
+  async function alternarTicker(chip) {
+    const ticker = chip.dataset.ticker;
+    const activo = chip.classList.contains("activo");
+    try {
+      const usuarioActualizado = await ErnestoAPI.put("/api/auth/watchlist", {
+        ticker, accion: activo ? "quitar" : "agregar",
+      });
+      ErnestoAPI.actualizarUsuario(usuarioActualizado);
+      dibujarChips();
+      cargarWatchlist();
+    } catch (error) {
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+    }
+  }
+
+  async function cargarWatchlist() {
+    const usuario = ErnestoAPI.obtenerUsuario();
+    const watchlist = usuario?.watchlist || [];
+    const grid = document.getElementById("grid-watchlist");
+
+    if (!watchlist.length) {
+      grid.innerHTML = '<div class="estado-vacio" style="grid-column: 1/-1;">Aún no tienes tickers en tu watchlist. Selecciona uno arriba.</div>';
+      return;
+    }
+
+    try {
+      const resultados = await Promise.all(
+        watchlist.map((ticker) => ErnestoAPI.get(`/api/mercado/${ticker}?periodo=7`))
+      );
+      grid.innerHTML = resultados.map((r) => {
+        const ultimo = r.datos.at(-1);
+        const anterior = r.datos.at(-2);
+        const variacion = anterior ? ((ultimo.close - anterior.close) / anterior.close) * 100 : 0;
+        const subio = variacion >= 0;
+        return `
+          <div class="tarjeta tarjeta-watchlist">
+            <div class="cabecera-tarjeta">
+              <span class="ticker-nombre">${r.ticker}</span>
+              <span class="insignia ${subio ? "insignia-buy" : "insignia-sell"}">${subio ? "+" : ""}${variacion.toFixed(2)}%</span>
+            </div>
+            <div class="precio">$${ultimo.close?.toFixed(2) ?? "—"}</div>
+            <a href="ticker-detalle.html?ticker=${encodeURIComponent(r.ticker)}" style="font-size:12.5px; color:var(--color-cobre-suave);">Ver detalle →</a>
+          </div>
+        `;
+      }).join("");
+    } catch (error) {
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+      grid.innerHTML = '<div class="estado-vacio" style="grid-column: 1/-1;">No se pudo cargar la watchlist.</div>';
+    }
+  }
+</script>
+</body>
+</html>

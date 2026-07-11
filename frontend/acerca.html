@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acerca del Proyecto — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 22px; }
+  .tarjeta-acerca { max-width: 720px; margin-bottom: 16px; }
+  .tarjeta-acerca h3 { font-size: 14px; margin-bottom: 10px; color: var(--color-cobre-suave); }
+  .tarjeta-acerca p { font-size: 13.5px; color: var(--color-hueso-tenue); line-height: 1.7; }
+  .lista-stack { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip-stack { font-family: var(--fuente-datos); font-size: 11.5px; background: var(--color-roca-clara); padding: 4px 10px; border-radius: 100px; }
+</style>
+</head>
+<body data-pagina="acerca">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina"><h1>Acerca del proyecto</h1></div>
+
+    <div class="tarjeta tarjeta-acerca">
+      <h3>Ernesto Investing AI</h3>
+      <p>
+        Sistema web de apoyo a decisiones de inversión bursátil que combina datos reales de
+        Yahoo Finance con seis modelos de Inteligencia Artificial (SVC, LSTM, BiLSTM, GRU,
+        SimpleRNN y un Regresor LSTM) para generar señales de compra/venta y pronósticos de
+        precio sobre cinco empresas mineras con operaciones en Perú.
+      </p>
+      <div class="lista-stack">
+        <span class="chip-stack">Python</span><span class="chip-stack">FastAPI</span>
+        <span class="chip-stack">MongoDB Atlas</span><span class="chip-stack">yfinance</span>
+        <span class="chip-stack">scikit-learn</span><span class="chip-stack">TensorFlow/Keras</span>
+        <span class="chip-stack">Plotly.js</span><span class="chip-stack">Streamlit</span>
+      </div>
+    </div>
+
+    <div class="tarjeta tarjeta-acerca">
+      <h3>Curso</h3>
+      <p>
+        Introducción al Desarrollo de Software (iDeSo) — Facultad de Ingeniería de Sistemas e
+        Informática, Universidad Nacional Mayor de San Marcos. Proyecto final, ciclo 2026-II.
+      </p>
+    </div>
+
+    <div class="tarjeta tarjeta-acerca">
+      <h3>Docente</h3>
+      <p>Prof. Mg. Ing. Ernesto D. Cancho-Rodríguez, MBA — The George Washington University (EE.UU.)</p>
+    </div>
+
+    <div class="tarjeta tarjeta-acerca">
+      <h3>Tickers del estudio</h3>
+      <p>
+        FSM (Fortuna Silver Mines, NYSE) · VOLCABC1.LM (Volcan Compañía Minera, BVL) ·
+        ABX.TO (Barrick Gold, TSX) · BVN (Buenaventura, NYSE) · BHP (BHP Billiton, NYSE).
+      </p>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+</body>
+</html>

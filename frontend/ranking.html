@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ranking — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .cabecera-pagina h1 { font-size: 26px; margin-bottom: 6px; }
+  .cabecera-pagina p { color: var(--color-hueso-tenue); font-size: 14px; margin-bottom: 24px; }
+
+  .fila-ranking {
+    display: grid;
+    grid-template-columns: 40px 140px 1fr 120px 200px;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--color-veta);
+  }
+  .fila-ranking:last-child { border-bottom: none; }
+  .fila-ranking:hover { background: var(--color-roca-clara); }
+  @media (max-width: 800px) { .fila-ranking { grid-template-columns: 30px 1fr 90px; } .col-modelos, .col-barra { display: none; } }
+
+  .puesto { font-family: var(--fuente-datos); color: var(--color-hueso-debil); font-size: 15px; }
+  .col-ticker { font-family: var(--fuente-datos); font-weight: 700; font-size: 15px; }
+  .col-modelos { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mini-modelo { font-size: 10.5px; font-family: var(--fuente-datos); padding: 2px 7px; border-radius: 100px; }
+  .mini-buy { background: var(--color-buy-fondo); color: var(--color-buy); }
+  .mini-sell { background: var(--color-sell-fondo); color: var(--color-sell); }
+
+  .col-barra { position: relative; height: 8px; background: var(--color-veta); border-radius: 100px; overflow: hidden; }
+  .col-barra .relleno { position: absolute; top: 0; height: 100%; border-radius: 100px; }
+</style>
+</head>
+<body data-pagina="ranking">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Ranking de señales</h1>
+      <p>Los 5 tickers ordenados por consenso de los 5 modelos de clasificación (SVC + 4 RNNs).</p>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="tarjeta" style="padding: 6px 0;">
+      <div id="lista-ranking">
+        <div style="padding: 16px 18px;"><div class="skeleton" style="height:20px;"></div></div>
+        <div style="padding: 16px 18px;"><div class="skeleton" style="height:20px;"></div></div>
+        <div style="padding: 16px 18px;"><div class="skeleton" style="height:20px;"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", cargarRanking);
+
+  async function cargarRanking() {
+    const contenedor = document.getElementById("lista-ranking");
+    try {
+      const { ranking } = await ErnestoAPI.get("/api/ranking");
+      if (!ranking.length) {
+        contenedor.innerHTML = '<div class="estado-vacio">Aún no hay predicciones. Ejecuta los notebooks de modelos.</div>';
+        return;
+      }
+
+      const maxFuerza = Math.max(...ranking.map((r) => Math.abs(r.fuerza_senal)), 1);
+
+      contenedor.innerHTML = ranking.map((item, indice) => {
+        const esBuy = item.senal_consenso === "BUY";
+        const anchoBarra = Math.min(100, Math.abs(item.fuerza_senal) / maxFuerza * 100);
+        return `
+          <div class="fila-ranking">
+            <div class="puesto">#${indice + 1}</div>
+            <a href="ticker-detalle.html?ticker=${encodeURIComponent(item.ticker)}" class="col-ticker">${item.ticker}</a>
+            <div class="col-modelos">
+              ${Object.entries(item.modelos).map(([modelo, senal]) => `
+                <span class="mini-modelo ${senal === "BUY" ? "mini-buy" : "mini-sell"}">${modelo.toUpperCase()}</span>
+              `).join("")}
+            </div>
+            <span class="insignia ${esBuy ? "insignia-buy" : "insignia-sell"}">${item.senal_consenso} · ${item.fuerza_senal.toFixed(2)}</span>
+            <div class="col-barra">
+              <div class="relleno" style="width:${anchoBarra}%; right:${esBuy ? "auto" : "0"}; left:${esBuy ? "0" : "auto"}; background:${esBuy ? "var(--color-buy)" : "var(--color-sell)"};"></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    } catch (error) {
+      if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+        document.getElementById("aviso-api").style.display = "block";
+      }
+      contenedor.innerHTML = '<div class="estado-vacio">No se pudo cargar el ranking.</div>';
+    }
+  }
+</script>
+</body>
+</html>

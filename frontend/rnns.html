@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clasificadores RNN — Ernesto Investing AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  .cabecera-pagina { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .cabecera-pagina h1 { font-size: 26px; }
+
+  .grid-tarjetas-rnn { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+  @media (max-width: 1100px) { .grid-tarjetas-rnn { grid-template-columns: repeat(2, 1fr); } }
+
+  .tarjeta-rnn { text-align: center; padding: 20px 14px; cursor: pointer; border: 1px solid var(--color-veta); transition: border-color 0.15s ease; }
+  .tarjeta-rnn:hover { border-color: var(--color-cobre); }
+  .tarjeta-rnn.seleccionada { border-color: var(--color-cobre); background: rgba(181,113,60,0.08); }
+  .tarjeta-rnn .nombre-modelo { font-family: var(--fuente-display); font-size: 14px; margin-bottom: 8px; }
+  .tarjeta-rnn .senal-mini { font-family: var(--fuente-datos); font-size: 20px; font-weight: 700; margin: 6px 0; }
+  .tarjeta-rnn .accuracy-mini { font-size: 11.5px; color: var(--color-hueso-debil); }
+
+  .grid-dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1000px) { .grid-dos-columnas { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-pagina="rnns">
+
+<div class="app-layout">
+  <div id="sidebar-contenedor"></div>
+
+  <main class="contenido-principal">
+    <div class="topbar-movil">
+      <strong style="font-family: var(--fuente-display);">Ernesto Investing AI</strong>
+      <button id="boton-menu-movil" class="boton boton-secundario" aria-label="Abrir menú">☰</button>
+    </div>
+
+    <div class="cabecera-pagina">
+      <h1>Clasificadores RNN</h1>
+      <select id="selector-ticker">
+        <option value="FSM">FSM</option>
+        <option value="VOLCABC1.LM">VOLCABC1.LM</option>
+        <option value="ABX.TO">ABX.TO</option>
+        <option value="BVN" selected>BVN</option>
+        <option value="BHP">BHP</option>
+      </select>
+    </div>
+
+    <div id="aviso-api" class="mensaje-error" style="display:none;">
+      No se pudo conectar con la API. Verifica la URL en <a href="configuracion.html" style="text-decoration:underline;">Configuración</a>.
+    </div>
+
+    <div class="grid-tarjetas-rnn" id="grid-tarjetas-rnn">
+      <div class="tarjeta"><div class="skeleton" style="height:90px;"></div></div>
+      <div class="tarjeta"><div class="skeleton" style="height:90px;"></div></div>
+      <div class="tarjeta"><div class="skeleton" style="height:90px;"></div></div>
+      <div class="tarjeta"><div class="skeleton" style="height:90px;"></div></div>
+    </div>
+
+    <div class="grid-dos-columnas">
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">Comparación de F1-score</h3>
+        <div id="grafico-barras-rnn" style="min-height:300px;"></div>
+      </div>
+      <div class="tarjeta">
+        <h3 style="font-size:13px; text-transform:uppercase; color:var(--color-hueso-tenue); margin-bottom:14px;">
+          Curva de entrenamiento — <span id="titulo-modelo-curva">SVC</span>
+        </h3>
+        <div id="grafico-curva-rnn" style="min-height:300px;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/shell.js"></script>
+<script>
+  const NOMBRES_RNN = { lstm: "LSTM", bilstm: "BiLSTM", gru: "GRU", simplernn: "SimpleRNN" };
+  let metricasActuales = [];
+
+  document.addEventListener("DOMContentLoaded", () => {
+    cargarRnns();
+    document.getElementById("selector-ticker").addEventListener("change", cargarRnns);
+  });
+
+  async function cargarRnns() {
+    const ticker = document.getElementById("selector-ticker").value;
+    try {
+      const [predicciones, comparador] = await Promise.all([
+        ErnestoAPI.get(`/api/predicciones/rnn/${ticker}`),
+        ErnestoAPI.get(`/api/metricas/comparador/${ticker}`),
+      ]);
+
+      metricasActuales = comparador.modelos.filter((m) => Object.keys(NOMBRES_RNN).includes(m.modelo));
+      dibujarTarjetas(predicciones.predicciones, metricasActuales);
+      dibujarBarras(metricasActuales);
+      if (metricasActuales[0]) dibujarCurva(metricasActuales[0]);
+    } catch (error) {
+      manejarError(error);
+    }
+  }
+
+  function dibujarTarjetas(predicciones, metricas) {
+    const grid = document.getElementById("grid-tarjetas-rnn");
+    grid.innerHTML = Object.keys(NOMBRES_RNN).map((modelo) => {
+      const prediccion = predicciones.find((p) => p.modelo === modelo);
+      const metrica = metricas.find((m) => m.modelo === modelo);
+      const esBuy = prediccion?.senal === "BUY";
+      return `
+        <div class="tarjeta tarjeta-rnn" data-modelo="${modelo}">
+          <div class="nombre-modelo">${NOMBRES_RNN[modelo]}</div>
+          <div class="senal-mini" style="color: ${esBuy ? "var(--color-buy)" : "var(--color-sell)"};">${prediccion?.senal || "—"}</div>
+          <div class="accuracy-mini">Accuracy: ${metrica ? (metrica.metricas.accuracy * 100).toFixed(1) + "%" : "—"}</div>
+        </div>
+      `;
+    }).join("");
+
+    document.querySelectorAll(".tarjeta-rnn").forEach((tarjeta) => {
+      tarjeta.addEventListener("click", () => {
+        document.querySelectorAll(".tarjeta-rnn").forEach((t) => t.classList.remove("seleccionada"));
+        tarjeta.classList.add("seleccionada");
+        const metrica = metricasActuales.find((m) => m.modelo === tarjeta.dataset.modelo);
+        if (metrica) dibujarCurva(metrica);
+      });
+    });
+  }
+
+  function dibujarBarras(metricas) {
+    Plotly.newPlot("grafico-barras-rnn", [{
+      x: metricas.map((m) => NOMBRES_RNN[m.modelo]),
+      y: metricas.map((m) => m.metricas.f1),
+      type: "bar",
+      marker: { color: ["#b5713c", "#8da3b0", "#3f9463", "#d9925f"] },
+    }], {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+      margin: { t: 10, r: 10, l: 40, b: 30 },
+      yaxis: { range: [0, 1], gridcolor: "#262d3a", title: "F1-score" },
+      xaxis: { gridcolor: "#262d3a" },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function dibujarCurva(metrica) {
+    document.getElementById("titulo-modelo-curva").textContent = NOMBRES_RNN[metrica.modelo];
+    const historial = metrica.historial_entrenamiento || [];
+
+    Plotly.newPlot("grafico-curva-rnn", [
+      { x: historial.map((h) => h.epoca), y: historial.map((h) => h.accuracy), name: "Accuracy (train)", type: "scatter", mode: "lines", line: { color: "#3f9463" } },
+      { x: historial.map((h) => h.epoca), y: historial.map((h) => h.val_accuracy), name: "Accuracy (val)", type: "scatter", mode: "lines", line: { color: "#3f9463", dash: "dot" } },
+    ], {
+      paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+      font: { color: "#e9e6e0", family: "Inter, sans-serif", size: 11 },
+      margin: { t: 10, r: 10, l: 40, b: 30 },
+      xaxis: { title: "Época", gridcolor: "#262d3a" },
+      yaxis: { title: "Accuracy", gridcolor: "#262d3a", range: [0, 1] },
+      legend: { orientation: "h", y: -0.2 },
+    }, { responsive: true, displayModeBar: false });
+  }
+
+  function manejarError(error) {
+    if (error.codigo === "API_NO_CONFIGURADA" || error.codigo === "SIN_CONEXION") {
+      document.getElementById("aviso-api").style.display = "block";
+    }
+    document.getElementById("grid-tarjetas-rnn").innerHTML =
+      '<div class="estado-vacio">No hay predicciones RNN para este ticker. Ejecuta los Notebooks 03/03b.</div>';
+  }
+</script>
+</body>
+</html>
